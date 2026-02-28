@@ -20,6 +20,48 @@ async function cerrarPopup(page) {
   if (n > 0) { await page.click('button:has-text("ACEPTAR")'); await page.waitForTimeout(1000); }
 }
 
+
+// ─── Configurar campos adicionales del proceso Plotter UV / UV Plus ──────────
+async function configurarProcesoPlotter(page, datos) {
+  const esUVPlus = (datos.proceso || '').toLowerCase().includes('plus');
+  await page.waitForTimeout(2000);
+
+  const selectCobertura = page.locator('md-select[aria-label="Cobertura de tinta"]').first();
+  const coberturaCount = await selectCobertura.count();
+  if (coberturaCount > 0) {
+    await selectCobertura.click();
+    await page.waitForTimeout(1000);
+    const tipoCob = (datos.coberturaPlotter || 'estandar').toLowerCase();
+    await page.evaluate((t) => {
+      const items = document.querySelectorAll('md-option');
+      for (const item of items) {
+        if (item.innerText.toLowerCase().includes(t)) { item.click(); return; }
+      }
+      if (items[0]) items[0].click();
+    }, tipoCob);
+    await page.waitForTimeout(500);
+  }
+
+  if (esUVPlus) {
+    const selectBarniz = page.locator('md-select[aria-label="Requiere aplicación de Barniz"]').first();
+    const barnizCount = await selectBarniz.count();
+    if (barnizCount > 0) {
+      await selectBarniz.click();
+      await page.waitForTimeout(1000);
+      const respBarniz = datos.requiereBarniz ? 'requiere' : 'no requiere';
+      await page.evaluate((r) => {
+        const items = document.querySelectorAll('md-option');
+        for (const item of items) {
+          if (item.innerText.toLowerCase().includes(r)) { item.click(); return; }
+        }
+        if (items[0]) items[0].click();
+      }, respBarniz);
+      await page.waitForTimeout(500);
+    }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function agregarTerminacion(page, terminacion) {
   const tipo = terminacion.tipo.toLowerCase();
   const inputTerm = page.locator('input[placeholder="Buscar terminaciones"]');
@@ -254,6 +296,11 @@ async function cotizar(datos) {
 
   await selectFromDropdown(page, page.locator('input[placeholder="Buscar proceso"]'), datos.proceso);
   await cerrarPopup(page);
+
+  // Si es proceso plotter UV → configurar campos adicionales
+  if ((datos.proceso || '').toLowerCase().includes('plotter')) {
+    await configurarProcesoPlotter(page, datos);
+  }
 
   if (datos.terminaciones && datos.terminaciones.length > 0) {
     for (const terminacion of datos.terminaciones) {
